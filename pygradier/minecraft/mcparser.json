@@ -1,0 +1,541 @@
+{
+    "start": {
+        "region": "ParameterRegion",
+        "state": "CommandStartState"
+    },
+    "regions": {
+        "ParameterRegion": {
+            "states": {
+                "CommandStartState": {
+                    "group_defs": [
+                        {
+                            "name": "Slash",
+                            "regex": "/?"
+                        }
+                    ],
+                    "groups": [
+                        "Slash"
+                    ],
+                    "transitions": [
+                        {
+                            "target": "ParameterState"
+                        }
+                    ],
+                    "tokenize": false
+                },
+                "ParameterState": {
+                    "groups": [
+                        "Selector",
+                        "String",
+                        "Range",
+                        "Float",
+                        "Integer",
+                        "RelativeFloat",
+                        "Word"
+                    ],
+                    "transitions": [
+                        {
+                            "group": "Selector",
+                            "target": "SelectorParameterState",
+                            "operation": "push",
+                            "value": {
+                                "state": "WhitespaceState"
+                            }
+                        },
+                        {
+                            "target": "WhitespaceState"
+                        }
+                    ]
+                },
+                "WhitespaceState": {
+                    "group_defs": [
+                        {
+                            "name": "Whitespace",
+                            "regex": "\\s"
+                        }
+                    ],
+                    "groups": [
+                        "Whitespace"
+                    ],
+                    "transitions": [
+                        {
+                            "group": "Whitespace",
+                            "target": "ParameterState"
+                        }
+                    ],
+                    "tokenize": false
+                },
+                "SelectorParameterState": {
+                    "group_defs": [
+                        {
+                            "name": "SelectorOpen",
+                            "regex": "\\[\\s*"
+                        },
+                        {
+                            "name": "Whitespace",
+                            "regex": "(?=\\s)"
+                        }
+                    ],
+                    "groups": [
+                        "SelectorOpen",
+                        "Whitespace"
+                    ],
+                    "transitions": [
+                        {
+                            "group": "SelectorOpen",
+                            "target": "ArgumentState",
+                            "region": "SelectorArgumentRegion"
+                        },
+                        {
+                            "group": "Whitespace",
+                            "operation": "pop"
+                        }
+                    ],
+                    "tokenize": false
+                }
+            }
+        },
+        "SelectorArgumentRegion": {
+            "group_defs": [
+                {
+                    "name": "Negation",
+                    "regex": "!(?!\\s*\\!)"
+                }
+            ],
+            "states": {
+                "ArgumentState": {
+                    "group_defs": [
+                        {
+                            "name": "SelectorArgument",
+                            "regex": "\\w+(?=\\s*\\=)"
+                        },
+                        {
+                            "name": "ScoresArgument",
+                            "regex": "scores(?=\\s*\\=)"
+                        },
+                        {
+                            "name": "NBTArgument",
+                            "regex": "nbt(?=\\s*\\=)"
+                        },
+                        {
+                            "name": "SelectorClose",
+                            "regex": "\\]"
+                        }
+                    ],
+                    "groups": [
+                        "NBTArgument",
+                        "ScoresArgument",
+                        "SelectorArgument",
+                        "SelectorClose"
+                    ],
+                    "transitions": [
+                        {
+                            "group": "NBTArgument",
+                            "target": "OperatorState",
+                            "operation": "push",
+                            "value": {
+                                "state": "NBTArgumentState"
+                            }
+                        },
+                        {
+                            "group": "ScoresArgument",
+                            "target": "OperatorState",
+                            "operation": "push",
+                            "value": {
+                                "state": "ScoresArgumentState"
+                            }
+                        },
+                        {
+                            "group": "SelectorArgument",
+                            "target": "OperatorState",
+                            "operation": "push"
+                        },
+                        {
+                            "group": "SelectorClose",
+                            "operation": "pop"
+                        }
+                    ]
+                },
+                "NBTArgumentState": {
+                    "group_defs": [
+                        {
+                            "name": "NoOperation",
+                            "regex": "(?=.)|$"
+                        }
+                    ],
+                    "groups": [
+                        "NoOperation"
+                    ],
+                    "transitions": [
+                        {
+                            "target": "ArgumentState"
+                        }
+                    ],
+                    "tokenize": false
+                },
+                "ScoresArgumentState": {
+                    "group_defs": [
+                        {
+                            "name": "NoOperation",
+                            "regex": "(?=.)|$"
+                        }
+                    ],
+                    "groups": [
+                        "NoOperation"
+                    ],
+                    "transitions": [
+                        {
+                            "target": "ArgumentState"
+                        }
+                    ],
+                    "tokenize": false
+                },
+                "OperatorState": {
+                    "group_defs": [
+                        {
+                            "name": "Operator",
+                            "regex": "\\s*\\=\\s*"
+                        }
+                    ],
+                    "groups": [
+                        "Operator"
+                    ],
+                    "transitions": [
+                        {
+                            "target": "ValueState",
+                            "operation": "peek",
+                            "value": {
+                                "state": "ArgumentState"
+                            }
+                        },
+                        {
+                            "target": "ScoresState",
+                            "operation": "peek",
+                            "value": {
+                                "state": "ScoresArgumentState"
+                            }
+                        },
+                        {
+                            "target": "NBTState",
+                            "operation": "peek",
+                            "value": {
+                                "state": "NBTArgumentState"
+                            }
+                        },
+                        {
+                            "target": "ScoresValueState",
+                            "operation": "peek",
+                            "value": {
+                                "state": "ScoresObjectiveState"
+                            }
+                        }
+                    ],
+                    "tokenize": false
+                },
+                "NBTState": {
+                    "group_defs": [
+                        {
+                            "name": "CompoundOpen",
+                            "regex": "\\{"
+                        }
+                    ],
+                    "groups": [
+                        "Negation",
+                        "CompoundOpen"
+                    ],
+                    "transitions": [
+                        {
+                            "group": "Negation",
+                            "target": "NBTWhitespaceState"
+                        },
+                        {
+                            "group": "CompoundOpen",
+                            "target": "CompoundState",
+                            "region": "NBTRegion",
+                            "operation": "push",
+                            "value": {
+                                "state": "ValueEndState"
+                            }
+                        }
+                    ]
+                },
+                "NBTWhitespaceState": {
+                    "group_defs": [
+                        {
+                            "name": "Whitespace",
+                            "regex": "\\s*"
+                        }
+                    ],
+                    "groups": [
+                        "Whitespace"
+                    ],
+                    "transitions": [
+                        {
+                            "target": "NBTState"
+                        }
+                    ],
+                    "tokenize": false
+                },
+                "ScoresState": {
+                    "group_defs": [
+                        {
+                            "name": "ScoresOpen",
+                            "regex": "\\{"
+                        }
+                    ],
+                    "groups": [
+                        "ScoresOpen"
+                    ],
+                    "transitions": [
+                        {
+                            "target": "ScoresWhitespaceState",
+                            "operation": "push",
+                            "value": {
+                                "state": "ValueEndState"
+                            }
+                        }
+                    ]
+                },
+                "ScoresWhitespaceState": {
+                    "group_defs": [
+                        {
+                            "name": "Whitespace",
+                            "regex": "\\s*"
+                        }
+                    ],
+                    "groups": [
+                        "Whitespace"
+                    ],
+                    "transitions": [
+                        {
+                            "target": "ScoresObjectiveState"
+                        }
+                    ],
+                    "tokenize": false
+                },
+                "ScoresObjectiveState": {
+                    "group_defs": [
+                        {
+                            "name": "ScoreboardObjective",
+                            "regex": "\\w+(?=\\s*\\=)"
+                        },
+                        {
+                            "name": "ScoresClose",
+                            "regex": "\\}"
+                        }
+                    ],
+                    "groups": [
+                        "ScoreboardObjective",
+                        "ScoresClose"
+                    ],
+                    "transitions": [
+                        {
+                            "group": "ScoreboardObjective",
+                            "target": "OperatorState",
+                            "operation": "push"
+                        },
+                        {
+                            "group": "ScoresClose",
+                            "operation": "pop"
+                        }
+                    ]
+                },
+                "ValueState": {
+                    "groups": [
+                        "Negation",
+                        "String",
+                        "Range",
+                        "Float",
+                        "Integer",
+                        "Word"
+                    ],
+                    "transitions": [
+                        {
+                            "group": "Negation",
+                            "target": "ValueWhitespaceState"
+                        },
+                        {
+                            "target": "ValueEndState"
+                        }
+                    ]
+                },
+                "ValueWhitespaceState": {
+                    "group_defs": [
+                        {
+                            "name": "Whitespace",
+                            "regex": "\\s*"
+                        }
+                    ],
+                    "groups": [
+                        "Whitespace"
+                    ],
+                    "transitions": [
+                        {
+                            "target": "ValueState"
+                        }
+                    ],
+                    "tokenize": false
+                },
+                "ScoresValueState": {
+                    "groups": [
+                        "Range",
+                        "Integer"
+                    ],
+                    "transitions": [
+                        {
+                            "target": "ScoresEndState"
+                        }
+                    ]
+                },
+                "ScoresEndState": {
+                    "group_defs": [
+                        {
+                            "name": "Operator",
+                            "regex": "\\s*(?:,\\s*|(?=\\}))"
+                        }
+                    ],
+                    "groups": [
+                        "Operator"
+                    ],
+                    "transitions": [
+                        {
+                            "operation": "pop"
+                        }
+                    ],
+                    "tokenize": false
+                },
+                "ValueEndState": {
+                    "group_defs": [
+                        {
+                            "name": "Operator",
+                            "regex": "\\s*(?:,\\s*|(?=\\]))"
+                        }
+                    ],
+                    "groups": [
+                        "Operator"
+                    ],
+                    "transitions": [
+                        {
+                            "operation": "pop"
+                        }
+                    ],
+                    "tokenize": false
+                }
+            }
+        },
+        "NBTRegion": {
+            "group_defs": [
+                {
+                    "name": "CompoundOpen",
+                    "regex": "\\{"
+                },
+                {
+                    "name": "ArrayOpen",
+                    "regex": "\\["
+                }
+            ],
+            "states": {
+                "CompoundOpen": {
+                    "group_defs": [
+                        {
+                            "name": "Whitespace",
+                            "regex": "\\s*"
+                        }
+                    ],
+                    "groups": [
+                        "Whitespace"
+                    ],
+                    "transitions": [
+                        {
+                            "target": "CompoundState"
+                        }
+                    ],
+                    "tokenize": false
+                },
+                "CompoundState": {
+                    "group_defs": [
+                        {
+                            "name": "TagName",
+                            "regex": "\\w+(?=\\s*:)"
+                        },
+                        {
+                            "name": "CompoundClose",
+                            "regex": "\\}"
+                        }
+                    ],
+                    "groups": [
+                        "TagName",
+                        "CompoundClose"
+                    ],
+                    "transitions": [
+                        {
+                            "group": "TagName",
+                            "target": "OperatorState",
+                            "operation": "push"
+                        },
+                        {
+                            "group": "CompoundClose",
+                            "operation": "pop"
+                        }
+                    ]
+                },
+                "OperatorState": {
+                    "group_defs": [
+                        {
+                            "name": "Operator",
+                            "regex": "\\s*:\\s*"
+                        }
+                    ],
+                    "groups": [
+                        "Operator"
+                    ],
+                    "transitions": [
+                        {
+                            "target": "ValueState"
+                        }
+                    ],
+                    "tokenize": false
+                },
+                "ValueState": {
+                    "groups": [
+                        "CompoundOpen",
+                        "ArrayOpen",
+                        "String",
+                        "Number",
+                        "Word"
+                    ],
+                    "transitions": [
+                        {
+                            "group": "CompoundOpen",
+                            "target": "CompoundOpen",
+                            "operation": "push",
+                            "value": {
+                                "state": "ValueEndState"
+                            }
+                        },
+                        {
+                            "target": "ValueEndState"
+                        }
+                    ]
+                },
+                "ValueEndState": {
+                    "group_defs": [
+                        {
+                            "name": "Operator",
+                            "regex": "\\s*(?:,\\s*|(?=\\}))"
+                        }
+                    ],
+                    "groups": [
+                        "Operator"
+                    ],
+                    "transitions": [
+                        {
+                            "operation": "pop"
+                        }
+                    ],
+                    "tokenize": false
+                }
+            }
+        }
+    }
+}
