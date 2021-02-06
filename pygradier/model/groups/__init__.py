@@ -7,3 +7,4 @@ from pygradier.model.Group import Number
 from pygradier.model.Group import Word
 from pygradier.model.Group import String
 from pygradier.model.Group import Selector
+from pygradier.model.Group import NamespacedID

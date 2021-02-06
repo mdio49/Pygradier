@@ -71,3 +71,6 @@ String = GenericGroup("string", r'\"(?:\\.|[^\"])*\"|\'(?:\\.|[^\'])*\'')
 
 """A group that matches an entity selector."""
 Selector = GenericGroup("selector", r'@[aeprs]')
+
+"""A group that matches a namespaced ID."""
+NamespacedID = GenericGroup("namespaced_id", r'#?[a-z0-9_\-\.]+:[a-z0-9_\-\./]+')

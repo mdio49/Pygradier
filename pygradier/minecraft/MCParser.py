@@ -26,7 +26,7 @@ class Parameter(Token):
         super().__init__(match, group, tokens)
     
     def __str__(self):
-        return self.match
+        return self.get_command_string()
 
     def get_command_string(self):
         return self.match
@@ -177,6 +177,41 @@ class SelectorParameter(Parameter):
             return f'..{high}'
         return None
 
+class NamespacedIDParameter(Parameter):
+
+    def __init__(self, token: Token):
+        super().__init__(token.match, NamespacedID, token.tokens)
+        self.__block_states = {}
+        self.__nbt = TAG_Compound("")
+        for subtoken in token.tokens:
+            if subtoken.group.name == 'BlockStatesOpen':
+                for state in subtoken.tokens:
+                    if state.group.name == 'BlockStatesEnd':
+                        break
+                    self.__block_states[state.match] = state.tokens[0].match
+            if subtoken.group.name == 'CompoundOpen':
+                self.__nbt = NBTToken(subtoken).nbt
+
+    @property
+    def namespace(self):
+        return self.match[:self.match.index(':')]
+
+    @property
+    def name(self):
+        return self.match[self.match.index(':')+1:]
+
+    @property
+    def block_states(self):
+        return self.__block_states
+    
+    @property
+    def nbt(self):
+        return self.__nbt
+    
+    def get_command_string(self):
+        block_states_str = ('[' + ','.join(f'{k}={v}' for k, v in self.block_states.items()) + ']') if len(self.block_states) > 0 else ''
+        return f"{self.namespace}:{self.name}{block_states_str}{self.nbt if len(self.nbt) > 0 else ''}"
+
 class MCParser:
 
     def __init__(self):
@@ -203,9 +238,11 @@ class MCParser:
         parameters = []
         for token in tokens:
             parameter = None
-            if token.group.name == "selector":
+            if token.group == Selector:
                 selector = next(t for t in SelectorType if t.value == token.match)
                 parameter = SelectorParameter(selector, token.tokens[:-1])
+            elif token.group == NamespacedID:
+                parameter = NamespacedIDParameter(token)
             else:
                 parameter = Parameter(token.match, token.group, token.tokens)
             parameters.append(parameter)

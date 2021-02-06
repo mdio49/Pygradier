@@ -13,7 +13,8 @@ PREDEFINED_GROUPS = {
     "Number": Number,
     "Word": Word,
     "String": String,
-    "Selector": Selector
+    "Selector": Selector,
+    "NamespacedID": NamespacedID
 }
 
 class Model:

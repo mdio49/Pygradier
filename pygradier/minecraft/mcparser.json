@@ -31,12 +31,21 @@
                         "Float",
                         "Integer",
                         "RelativeFloat",
+                        "NamespacedID",
                         "Word"
                     ],
                     "transitions": [
                         {
                             "group": "Selector",
                             "target": "SelectorParameterState",
+                            "operation": "push",
+                            "value": {
+                                "state": "WhitespaceState"
+                            }
+                        },
+                        {
+                            "group": "NamespacedID",
+                            "target": "NamespacedIDState_BlockStates",
                             "operation": "push",
                             "value": {
                                 "state": "WhitespaceState"
@@ -88,6 +97,148 @@
                         },
                         {
                             "group": "Whitespace",
+                            "operation": "pop"
+                        }
+                    ],
+                    "tokenize": false
+                },
+                "NamespacedIDState_BlockStates": {
+                    "group_defs": [
+                        {
+                            "name": "BlockStatesOpen",
+                            "regex": "\\["
+                        },
+                        {
+                            "name": "Separator",
+                            "regex": "(?=.)"
+                        }
+                    ],
+                    "groups": [
+                        "BlockStatesOpen",
+                        "Separator"
+                    ],
+                    "transitions": [
+                        
+                        {
+                            "group": "BlockStatesOpen",
+                            "target": "BlockStatesStartState",
+                            "operation": "push",
+                            "value": {
+                                "state": "NamespacedIDState_DataTags"
+                            }
+                        },
+                        {
+                            "target": "NamespacedIDState_DataTags"
+                        }
+                    ]
+                },
+                "NamespacedIDState_DataTags": {
+                    "group_defs": [
+                        {
+                            "name": "CompoundOpen",
+                            "regex": "\\{"
+                        },
+                        {
+                            "name": "NamespacedIDEnd",
+                            "regex": "(?=\\s)"
+                        }
+                    ],
+                    "groups": [
+                        "CompoundOpen",
+                        "NamespacedIDEnd"
+                    ],
+                    "transitions": [
+                        {
+                            "group": "CompoundOpen",
+                            "target": "CompoundOpen",
+                            "region": "NBTRegion",
+                            "operation": "push"
+                        },
+                        {
+                            "group": "NamespacedIDEnd",
+                            "operation": "pop"
+                        }
+                    ]
+                },
+                "BlockStatesStartState": {
+                    "group_defs": [
+                        {
+                            "name": "Whitespace",
+                            "regex": "\\s*"
+                        }
+                    ],
+                    "groups": [
+                        "Whitespace"
+                    ],
+                    "transitions": [
+                        {
+                            "target": "BlockStatesNameState"
+                        }
+                    ],
+                    "tokenize": false
+                },
+                "BlockStatesNameState": {
+                    "group_defs": [
+                        {
+                            "name": "BlockStatesEnd",
+                            "regex": "\\]"
+                        }
+                    ],
+                    "groups": [
+                        "BlockStatesEnd",
+                        "Word"
+                    ],
+                    "transitions": [
+                        {
+                            "group": "Word",
+                            "target": "BlockStatesOperatorState",
+                            "operation": "push"
+                        },
+                        {
+                            "group": "BlockStatesEnd",
+                            "operation": "pop"
+                        }
+                    ]
+                },
+                "BlockStatesOperatorState": {
+                    "group_defs": [
+                        {
+                            "name": "Operator",
+                            "regex": "\\s*=\\s*"
+                        }
+                    ],
+                    "groups": [
+                        "Operator"
+                    ],
+                    "transitions": [
+                        {
+                            "target": "BlockStatesValueState"
+                        }
+                    ],
+                    "tokenize": false
+                },
+                "BlockStatesValueState": {
+                    "groups": [
+                        "Word"
+                    ],
+                    "transitions": [
+                        {
+                            "target": "BlockStatesEndState"
+                        }
+                    ]
+                },
+                "BlockStatesEndState": {
+                    "group_defs": [
+                        {
+                            "name": "Operator",
+                            "regex": "\\s*(?:,\\s*|(?=\\]))"
+                        }
+                    ],
+                    "groups": [
+                        "Operator"
+                    ],
+                    "transitions": [
+                        {
                             "operation": "pop"
                         }
                     ],
