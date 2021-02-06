@@ -75,15 +75,15 @@ class NBTToken(Token):
             else:
                 tag = TAG_String(name, value.match)
         elif value.group.name == "ByteArrayOpen":
-            tag = TAG_Byte_Array(name, [int(entry.match) for entry in value.tokens])
+            tag = TAG_Byte_Array(name, [int(entry.match) for entry in value.tokens[:-1]])
         elif value.group.name == "IntArrayOpen":
-            tag = TAG_Int_Array(name, [int(entry.match) for entry in value.tokens])
+            tag = TAG_Int_Array(name, [int(entry.match) for entry in value.tokens[:-1]])
         elif value.group.name == "LongArrayOpen":
-            tag = TAG_Long_Array(name, [int(entry.match) for entry in value.tokens])
-        elif value.group.name == "ArrayOpen":
+            tag = TAG_Long_Array(name, [int(entry.match) for entry in value.tokens[:-1]])
+        elif value.group.name == "ListOpen":
             tag = TAG_List(name, None)
             for entry in value.tokens:
-                if sub_token.group.name == "ArrayClose":
+                if entry.group.name == "ListClose":
                     break
                 tag.append(cls.__get_tag(entry))
         elif value.group.name == "CompoundOpen":

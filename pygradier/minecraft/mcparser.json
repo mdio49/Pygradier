@@ -581,12 +581,24 @@
                     "regex": "\\{"
                 },
                 {
-                    "name": "ArrayOpen",
+                    "name": "ListOpen",
                     "regex": "\\["
+                },
+                {
+                    "name": "ByteArrayOpen",
+                    "regex": "\\[B;"
+                },
+                {
+                    "name": "IntArrayOpen",
+                    "regex": "\\[I;"
+                },
+                {
+                    "name": "LongArrayOpen",
+                    "regex": "\\[L;"
                 }
             ],
-            "states": {
-                "CompoundOpen": {
+            "templates": {
+                "OpenTemplate": {
                     "group_defs": [
                         {
                             "name": "Whitespace",
@@ -596,12 +608,33 @@
                     "groups": [
                         "Whitespace"
                     ],
+                    "tokenize": false
+                }
+            },
+            "states": {
+                "CompoundOpen": {
+                    "template": "OpenTemplate",
                     "transitions": [
                         {
                             "target": "CompoundState"
                         }
-                    ],
-                    "tokenize": false
+                    ]
+                },
+                "ListOpen": {
+                    "template": "OpenTemplate",
+                    "transitions": [
+                        {
+                            "target": "ListState"
+                        }
+                    ]
+                },
+                "ArrayOpen": {
+                    "template": "OpenTemplate",
+                    "transitions": [
+                        {
+                            "target": "ArrayState"
+                        }
+                    ]
                 },
                 "CompoundState": {
                     "group_defs": [
@@ -647,10 +680,79 @@
                     ],
                     "tokenize": false
                 },
+                "ListState": {
+                    "group_defs": [
+                        {
+                            "name": "ListEntry",
+                            "regex": "(?=.)"
+                        },
+                        {
+                            "name": "ListClose",
+                            "regex": "\\]"
+                        }
+                    ],
+                    "groups": [
+                        "ListClose",
+                        "ListEntry"
+                    ],
+                    "transitions": [
+                        {
+                            "group": "ListClose",
+                            "operation": "pop"
+                        },
+                        {
+                            "group": "ListEntry",
+                            "target": "ValueState",
+                            "operation": "push"
+                        }
+                    ]
+                },
+                "ArrayState": {
+                    "group_defs": [
+                        {
+                            "name": "ArrayClose",
+                            "regex": "\\]"
+                        }
+                    ],
+                    "groups": [
+                        "ArrayClose",
+                        "Integer"
+                    ],
+                    "transitions": [
+                        {
+                            "group": "ArrayClose",
+                            "operation": "pop"
+                        },
+                        {
+                            "group": "Integer",
+                            "target": "ArrayOperatorState"
+                        }
+                    ]
+                },
+                "ArrayOperatorState": {
+                    "group_defs": [
+                        {
+                            "name": "Operator",
+                            "regex": "\\s*(?:,\\s*|(?=\\]))"
+                        }
+                    ],
+                    "groups": [
+                        "Operator"
+                    ],
+                    "transitions": [
+                        {
+                            "target": "ArrayState"
+                        }
+                    ],
+                    "tokenize": false
+                },
                 "ValueState": {
                     "groups": [
                         "CompoundOpen",
-                        "ArrayOpen",
+                        "ByteArrayOpen",
+                        "IntArrayOpen",
+                        "LongArrayOpen",
+                        "ListOpen",
                         "String",
                         "Number",
                         "Word"
@@ -665,6 +767,38 @@
                             }
                         },
                         {
+                            "group": "ListOpen",
+                            "target": "ListOpen",
+                            "operation": "push",
+                            "value": {
+                                "state": "ValueEndState"
+                            }
+                        },
+                        {
+                            "group": "ByteArrayOpen",
+                            "target": "ArrayOpen",
+                            "operation": "push",
+                            "value": {
+                                "state": "ValueEndState"
+                            }
+                        },
+                        {
+                            "group": "IntArrayOpen",
+                            "target": "ArrayOpen",
+                            "operation": "push",
+                            "value": {
+                                "state": "ValueEndState"
+                            }
+                        },
+                        {
+                            "group": "LongArrayOpen",
+                            "target": "ArrayOpen",
+                            "operation": "push",
+                            "value": {
+                                "state": "ValueEndState"
+                            }
+                        },
+                        {
                             "target": "ValueEndState"
                         }
                     ]
@@ -673,7 +807,7 @@
                     "group_defs": [
                         {
                             "name": "Operator",
-                            "regex": "\\s*(?:,\\s*|(?=\\}))"
+                            "regex": "\\s*(?:,\\s*|(?=\\})|(?=\\]))"
                         }
                     ],
                     "groups": [
