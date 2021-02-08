@@ -52,19 +52,22 @@ Generic = GenericGroup("generic", r'[^\s]+')
 Integer = GenericGroup("integer", r'-?\d+')
 
 """A group that matches decimal numbers."""
-Float = GenericGroup("float", r'\d*\.\d+')
+Float = GenericGroup("float", r'-?\d*\.?\d+')
 
 """A group that matches a range."""
 Range = GenericGroup("range", r'-?\d+\.{2}(?:-?\d+)?|(?:-?\d+)?\.{2}-?\d+')
 
+"""A group that matches an interval."""
+Interval = GenericGroup("interval", r'-?\d*\.?\d+\.{2}(?:-?\d*\.?\d+)?|(?:-?\d*\.?\d+)?\.{2}-?\d*\.?\d+')
+
 """A group that matches a decimal number that can optionally be prefixed using tilde (~) or caret (^) notation."""
-RelativeFloat = GenericGroup("relfloat", r'[~\^]?\d*\.?\d+|[~\^]')
+RelativeFloat = GenericGroup("relfloat", r'[~\^]?-?\d*\.?\d+|[~\^]')
 
 """A group that matches a decimal number that may have a literal character suffixed to the end of it."""
-Number = GenericGroup("number", r'-?\d*\.?\d+[BbDdFfLlSs]?')
+Number = GenericGroup("number", r'-?\d*\.?\d+[BbDdFfLlSst]?')
 
 """A group that matches a series of alphanumeric characters with no spaces."""
-Word = GenericGroup("word", r'\w+')
+Word = GenericGroup("word", r'[A-Za-z0-9_\-$#/]+')
 
 """A group that matches a string."""
 String = GenericGroup("string", r'\"(?:\\.|[^\"])*\"|\'(?:\\.|[^\'])*\'')
@@ -73,4 +76,4 @@ String = GenericGroup("string", r'\"(?:\\.|[^\"])*\"|\'(?:\\.|[^\'])*\'')
 Selector = GenericGroup("selector", r'@[aeprs]')
 
 """A group that matches a namespaced ID."""
-NamespacedID = GenericGroup("namespaced_id", r'#?[a-z0-9_\-\.]+:[a-z0-9_\-\./]+')
+NamespacedID = GenericGroup("namespaced_id", r'#?[a-z0-9_\-\.]+:[a-z0-9_\-\./]+|#[a-z0-9_\-\.]+|[a-z0-9_\-\./]+(?=[\\[{])|[a-z0-9_\-\./]+\.[a-z0-9_\-\./]+')

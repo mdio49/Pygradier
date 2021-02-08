@@ -38,4 +38,4 @@ class State:
                 continue
             if t.group == group or t.group is None:
                 return Transition(group, stack[-1][0], operation=t.operation) if t.operation == Operation.POP else t
-        return Transition(group, self)
+        return None

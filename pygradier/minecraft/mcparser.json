@@ -1,42 +1,136 @@
 {
+    "group_defs": [
+        {
+            "name": "Boolean",
+            "regex": "true|false"
+        },
+        {
+            "name": "CompoundOpen",
+            "regex": "\\{"
+        },
+        {
+            "name": "ListOpen",
+            "regex": "\\["
+        }
+    ],
     "start": {
         "region": "ParameterRegion",
         "state": "CommandStartState"
     },
     "regions": {
         "ParameterRegion": {
+            "group_defs": [
+                {
+                    "name": "Operator",
+                    "regex": "\\.(?![:.])"
+                },
+                {
+                    "name": "ListIndexOpen",
+                    "regex": "\\[(?=-?\\d+\\]|\\{)"
+                },
+                {
+                    "name": "ListIndexClose",
+                    "regex": "\\]"
+                },
+                {
+                    "name": "ParameterEnd",
+                    "regex": "(?=\\s)|$"
+                }
+            ],
             "states": {
                 "CommandStartState": {
                     "group_defs": [
                         {
-                            "name": "Slash",
+                            "name": "CommentStart",
+                            "regex": "#\\s*"
+                        },
+                        {
+                            "name": "CommandStart",
                             "regex": "/?"
                         }
                     ],
                     "groups": [
-                        "Slash"
+                        "CommentStart",
+                        "CommandStart"
                     ],
                     "transitions": [
                         {
+                            "group": "CommentStart",
+                            "target": "CommentState"
+                        },
+                        {
+                            "group": "CommandStart",
                             "target": "ParameterState"
                         }
                     ],
                     "tokenize": false
                 },
-                "ParameterState": {
+                "CommentState": {
+                    "group_defs": [
+                        {
+                            "name": "Comment",
+                            "regex": "^.*$"
+                        }
+                    ],
                     "groups": [
-                        "Selector",
-                        "String",
-                        "Range",
-                        "Float",
-                        "Integer",
-                        "RelativeFloat",
-                        "NamespacedID",
-                        "Word"
+                        "Comment"
                     ],
                     "transitions": [
                         {
-                            "group": "Selector",
+                            "operation": "end"
+                        }
+                    ]
+                },
+                "ParameterState": {
+                    "group_defs": [
+                        {
+                            "name": "HybridParameter",
+                            "regex": "(?=[^\\s])"
+                        },
+                        {
+                            "name": "SelectorParameter",
+                            "regex": "@[aeprs]"
+                        },
+                        {
+                            "name": "Keyword",
+                            "regex": "[A-Za-z0-9_\\-$#/]+(?:(?=\\s)|$)"
+                        },
+                        {
+                            "name": "UUID",
+                            "regex": "[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{12}"
+                        },
+                        {
+                            "name": "Symbol",
+                            "regex": "[<>]=?|[+\\-*/%]?=|><|\\*"
+                        },
+                        {
+                            "name": "EOL",
+                            "regex": "$"
+                        }
+                    ],
+                    "groups": [
+                        "UUID",
+                        "Symbol",
+                        "String",
+                        "Range",
+                        "Number",
+                        "Keyword",
+                        "RelativeFloat",
+                        "SelectorParameter",
+                        "HybridParameter",
+                        "EOL"
+                    ],
+                    "transitions": [
+                        {
+                            "group": "HybridParameter",
+                            "target": "ParameterState_FirstToken",
+                            "operation": "push",
+                            "value": {
+                                "state": "WhitespaceState"
+                            }
+                        },
+                        {
+                            "group": "SelectorParameter",
                             "target": "SelectorParameterState",
                             "operation": "push",
                             "value": {
@@ -44,23 +138,23 @@
                             }
                         },
                         {
-                            "group": "NamespacedID",
-                            "target": "NamespacedIDState_BlockStates",
-                            "operation": "push",
-                            "value": {
-                                "state": "WhitespaceState"
-                            }
+                            "group": "Keyword",
+                            "target": "WhitespaceState"
+                        },
+                        {
+                            "group": "EOL",
+                            "operation": "end"
                         },
                         {
                             "target": "WhitespaceState"
                         }
-                    ]
+                    ]  
                 },
                 "WhitespaceState": {
                     "group_defs": [
                         {
                             "name": "Whitespace",
-                            "regex": "\\s"
+                            "regex": "\\s|$"
                         }
                     ],
                     "groups": [
@@ -68,11 +162,217 @@
                     ],
                     "transitions": [
                         {
-                            "group": "Whitespace",
                             "target": "ParameterState"
                         }
                     ],
                     "tokenize": false
+                },
+                "ParameterState_FirstToken": {
+                    "groups": [
+                        "CompoundOpen",
+                        "ListOpen",
+                        "String",
+                        "Word"
+                    ],
+                    "transitions": [
+                        {
+                            "group": "CompoundOpen",
+                            "target": "CompoundOpen",
+                            "region": "NBTRegion",
+                            "operation": "push",
+                            "value": {
+                                "state": "OperatorState_NoCompounds"
+                            }
+                        },
+                        {
+                            "group": "ListOpen",
+                            "target": "ListOpen",
+                            "region": "NBTRegion",
+                            "operation": "push",
+                            "value": {
+                                "state": "ParameterEndState"
+                            }
+                        },
+                        {
+                            "group": "String",
+                            "target": "OperatorState_WithCompounds"
+                        },
+                        {
+                            "group": "Word",
+                            "target": "OperatorState_WithCompounds"
+                        },
+                        {
+                            "group": "Generic",
+                            "target": "OperatorState_WithCompounds"
+                        },
+                        {
+                            "target": "ParameterEndState"
+                        }
+                    ]
+                },
+                "ParameterState_ChainedToken": {
+                    "groups": [
+                        "ParameterEnd",
+                        "String",
+                        "Word"
+                    ],
+                    "transitions": [
+                        {
+                            "group": "ParameterEnd",
+                            "operation": "pop"
+                        },
+                        {
+                            "target": "OperatorState_WithCompounds"
+                        }
+                    ]
+                },
+                "OperatorState_WithCompounds": {
+                    "group_defs": [
+                        {
+                            "name": "BlockStatesOpen",
+                            "regex": "\\["
+                        },
+                        {
+                            "name": "NamespaceSeparator",
+                            "regex": ":(?![:.])"
+                        }
+                    ],
+                    "groups": [
+                        "ParameterEnd",
+                        "CompoundOpen",
+                        "ListIndexOpen",
+                        "BlockStatesOpen",
+                        "NamespaceSeparator",
+                        "Operator"
+                    ],
+                    "transitions": [
+                        {
+                            "group": "CompoundOpen",
+                            "target": "CompoundOpen",
+                            "region": "NBTRegion",
+                            "operation": "push",
+                            "value": {
+                                "state": "OperatorState_NoCompounds"
+                            }
+                        },
+                        {
+                            "group": "ListIndexOpen",
+                            "target": "ListIndexState",
+                            "operation": "push",
+                            "value": {
+                                "state": "OperatorState_NoCompounds"
+                            }
+                        },
+                        {
+                            "group": "BlockStatesOpen",
+                            "target": "BlockStatesStartState",
+                            "operation": "push",
+                            "value": {
+                                "state": "OperatorState_Compound"
+                            }
+                        },
+                        {
+                            "group": "NamespaceSeparator",
+                            "target": "ParameterState_ChainedToken"
+                        },
+                        {
+                            "group": "Operator",
+                            "target": "ParameterState_ChainedToken"
+                        },
+                        {
+                            "group": "ParameterEnd",
+                            "operation": "pop"
+                        }
+                    ]
+                },
+                "OperatorState_NoCompounds": {
+                    "groups": [
+                        "ParameterEnd",
+                        "ListIndexOpen",
+                        "Operator"
+                    ],
+                    "transitions": [
+                        {
+                            "group": "ListIndexOpen",
+                            "target": "ListIndexState",
+                            "operation": "push"
+                        },
+                        {
+                            "group": "Operator",
+                            "target": "ParameterState_ChainedToken"
+                        },
+                        {
+                            "group": "ParameterEnd",
+                            "operation": "pop"
+                        }
+                    ]
+                },
+                "OperatorState_Compound": {
+                    "groups": [
+                        "ParameterEnd",
+                        "CompoundOpen"
+                    ],
+                    "transitions": [
+                        {
+                            "group": "CompoundOpen",
+                            "target": "CompoundOpen",
+                            "region": "NBTRegion",
+                            "operation": "push",
+                            "value": {
+                                "state": "ParameterEndState"
+                            }
+                        },
+                        {
+                            "group": "ParameterEnd",
+                            "operation": "pop"
+                        }
+                    ]
+                },
+                "ListIndexState": {
+                    "groups": [
+                        "ListIndexClose",
+                        "CompoundOpen",
+                        "Integer"
+                    ],
+                    "transitions": [
+                        {
+                            "group": "ListIndexClose",
+                            "operation": "pop"
+                        },
+                        {
+                            "group": "CompoundOpen",
+                            "target": "CompoundOpen",
+                            "region": "NBTRegion",
+                            "operation": "push",
+                            "value": {
+                                "state": "ListIndexEndState"
+                            }
+                        },
+                        {
+                            "group": "Integer",
+                            "target": "ListIndexEndState"
+                        }
+                    ]
+                },
+                "ListIndexEndState": {
+                    "groups": [
+                        "ListIndexClose"
+                    ],
+                    "transitions": [
+                        {
+                            "operation": "pop"
+                        }
+                    ]
+                },
+                "ParameterEndState": {
+                    "groups": [
+                        "ParameterEnd"
+                    ],
+                    "transitions": [
+                        {
+                            "operation": "pop"
+                        }
+                    ]
                 },
                 "SelectorParameterState": {
                     "group_defs": [
@@ -82,7 +382,7 @@
                         },
                         {
                             "name": "Whitespace",
-                            "regex": "(?=\\s)"
+                            "regex": "(?=\\s)|$"
                         }
                     ],
                     "groups": [
@@ -101,64 +401,6 @@
                         }
                     ],
                     "tokenize": false
-                },
-                "NamespacedIDState_BlockStates": {
-                    "group_defs": [
-                        {
-                            "name": "BlockStatesOpen",
-                            "regex": "\\["
-                        },
-                        {
-                            "name": "Separator",
-                            "regex": "(?=.)"
-                        }
-                    ],
-                    "groups": [
-                        "BlockStatesOpen",
-                        "Separator"
-                    ],
-                    "transitions": [
-                        
-                        {
-                            "group": "BlockStatesOpen",
-                            "target": "BlockStatesStartState",
-                            "operation": "push",
-                            "value": {
-                                "state": "NamespacedIDState_DataTags"
-                            }
-                        },
-                        {
-                            "target": "NamespacedIDState_DataTags"
-                        }
-                    ]
-                },
-                "NamespacedIDState_DataTags": {
-                    "group_defs": [
-                        {
-                            "name": "CompoundOpen",
-                            "regex": "\\{"
-                        },
-                        {
-                            "name": "NamespacedIDEnd",
-                            "regex": "(?=\\s)"
-                        }
-                    ],
-                    "groups": [
-                        "CompoundOpen",
-                        "NamespacedIDEnd"
-                    ],
-                    "transitions": [
-                        {
-                            "group": "CompoundOpen",
-                            "target": "CompoundOpen",
-                            "region": "NBTRegion",
-                            "operation": "push"
-                        },
-                        {
-                            "group": "NamespacedIDEnd",
-                            "operation": "pop"
-                        }
-                    ]
                 },
                 "BlockStatesStartState": {
                     "group_defs": [
@@ -253,6 +495,25 @@
                     "regex": "!(?!\\s*\\!)"
                 }
             ],
+            "templates": {
+                "NoOpToArgumentStateTemplate": {
+                    "group_defs": [
+                        {
+                            "name": "NoOperation",
+                            "regex": "(?=.)|$"
+                        }
+                    ],
+                    "groups": [
+                        "NoOperation"
+                    ],
+                    "transitions": [
+                        {
+                            "target": "ArgumentState"
+                        }
+                    ],
+                    "tokenize": false
+                }
+            },
             "states": {
                 "ArgumentState": {
                     "group_defs": [
@@ -269,6 +530,10 @@
                             "regex": "nbt(?=\\s*\\=)"
                         },
                         {
+                            "name": "AdvancementsArgument",
+                            "regex": "advancements(?=\\s*\\=)"
+                        },
+                        {
                             "name": "SelectorClose",
                             "regex": "\\]"
                         }
@@ -276,6 +541,7 @@
                     "groups": [
                         "NBTArgument",
                         "ScoresArgument",
+                        "AdvancementsArgument",
                         "SelectorArgument",
                         "SelectorClose"
                     ],
@@ -297,6 +563,14 @@
                             }
                         },
                         {
+                            "group": "AdvancementsArgument",
+                            "target": "OperatorState",
+                            "operation": "push",
+                            "value": {
+                                "state": "AdvancementsArgumentState"
+                            }
+                        },
+                        {
                             "group": "SelectorArgument",
                             "target": "OperatorState",
                             "operation": "push"
@@ -308,38 +582,13 @@
                     ]
                 },
                 "NBTArgumentState": {
-                    "group_defs": [
-                        {
-                            "name": "NoOperation",
-                            "regex": "(?=.)|$"
-                        }
-                    ],
-                    "groups": [
-                        "NoOperation"
-                    ],
-                    "transitions": [
-                        {
-                            "target": "ArgumentState"
-                        }
-                    ],
-                    "tokenize": false
+                    "template": "NoOpToArgumentStateTemplate"
                 },
                 "ScoresArgumentState": {
-                    "group_defs": [
-                        {
-                            "name": "NoOperation",
-                            "regex": "(?=.)|$"
-                        }
-                    ],
-                    "groups": [
-                        "NoOperation"
-                    ],
-                    "transitions": [
-                        {
-                            "target": "ArgumentState"
-                        }
-                    ],
-                    "tokenize": false
+                    "template": "NoOpToArgumentStateTemplate"
+                },
+                "AdvancementsArgumentState": {
+                    "template": "NoOpToArgumentStateTemplate"
                 },
                 "OperatorState": {
                     "group_defs": [
@@ -374,22 +623,30 @@
                             }
                         },
                         {
+                            "target": "AdvancementsState",
+                            "operation": "peek",
+                            "value": {
+                                "state": "AdvancementsArgumentState"
+                            }
+                        },
+                        {
                             "target": "ScoresValueState",
                             "operation": "peek",
                             "value": {
                                 "state": "ScoresObjectiveState"
+                            }
+                        },
+                        {
+                            "target": "AdvancementsValueState",
+                            "operation": "peek",
+                            "value": {
+                                "state": "AdvancementsNameState"
                             }
                         }
                     ],
                     "tokenize": false
                 },
                 "NBTState": {
-                    "group_defs": [
-                        {
-                            "name": "CompoundOpen",
-                            "regex": "\\{"
-                        }
-                    ],
                     "groups": [
                         "Negation",
                         "CompoundOpen"
@@ -468,7 +725,7 @@
                     "group_defs": [
                         {
                             "name": "ScoreboardObjective",
-                            "regex": "\\w+(?=\\s*\\=)"
+                            "regex": "[\\w\\.\\-+]+(?=\\s*\\=)"
                         },
                         {
                             "name": "ScoresClose",
@@ -491,14 +748,86 @@
                         }
                     ]
                 },
+                "AdvancementsState": {
+                    "group_defs": [
+                        {
+                            "name": "AdvancementsOpen",
+                            "regex": "\\{"
+                        }
+                    ],
+                    "groups": [
+                        "AdvancementsOpen"
+                    ],
+                    "transitions": [
+                        {
+                            "group": "AdvancementsOpen",
+                            "target": "AdvancementsWhitespaceState",
+                            "operation": "push",
+                            "value": {
+                                "state": "ValueEndState"
+                            }
+                        }
+                    ]
+                },
+                "AdvancementsWhitespaceState": {
+                    "group_defs": [
+                        {
+                            "name": "Whitespace",
+                            "regex": "\\s*"
+                        }
+                    ],
+                    "groups": [
+                        "Whitespace"
+                    ],
+                    "transitions": [
+                        {
+                            "target": "AdvancementsNameState"
+                        }
+                    ],
+                    "tokenize": false
+                },
+                "AdvancementsNameState": {
+                    "group_defs": [
+                        {
+                            "name": "Advancement",
+                            "regex": "(\\w+:)?[\\w/]+(?=\\s*=)"
+                        },
+                        {
+                            "name": "AdvancementsClose",
+                            "regex": "\\}"
+                        }
+                    ],
+                    "groups": [
+                        "Advancement",
+                        "AdvancementsClose"
+                    ],
+                    "transitions": [
+                        {
+                            "group": "Advancement",
+                            "target": "OperatorState",
+                            "operation": "push"
+                        },
+                        {
+                            "group": "AdvancementsClose",
+                            "operation": "pop"
+                        }
+                    ]
+                },
                 "ValueState": {
+                    "group_defs": [
+                        {
+                            "name": "Empty",
+                            "regex": "(?=\\s*[,\\]])"
+                        }
+                    ],
                     "groups": [
                         "Negation",
                         "String",
-                        "Range",
+                        "Interval",
                         "Float",
-                        "Integer",
-                        "Word"
+                        "NamespacedID",
+                        "Word",
+                        "Empty"
                     ],
                     "transitions": [
                         {
@@ -534,11 +863,121 @@
                     ],
                     "transitions": [
                         {
-                            "target": "ScoresEndState"
+                            "target": "BraceEndState"
                         }
                     ]
                 },
-                "ScoresEndState": {
+                "AdvancementsValueState": {
+                    "group_defs": [
+                        {
+                            "name": "CriteriaOpen",
+                            "regex": "\\{"
+                        }
+                    ],
+                    "groups": [
+                        "CriteriaOpen",
+                        "Boolean"
+                    ],
+                    "transitions": [
+                        {
+                            "group": "CriteriaOpen",
+                            "target": "CriteriaWhitespaceState",
+                            "operation": "push",
+                            "value": {
+                                "state": "BraceEndState"
+                            }
+                        },
+                        {
+                            "group": "Boolean",
+                            "target": "BraceEndState"
+                        }
+                    ]
+                },
+                "CriteriaWhitespaceState": {
+                    "group_defs": [
+                        {
+                            "name": "Whitespace",
+                            "regex": "\\s*"
+                        }
+                    ],
+                    "groups": [
+                        "Whitespace"
+                    ],
+                    "transitions": [
+                        {
+                            "target": "CriteriaState"
+                        }
+                    ],
+                    "tokenize": false
+                },
+                "CriteriaState": {
+                    "group_defs": [
+                        {
+                            "name": "CriteriaClose",
+                            "regex": "\\}"
+                        }
+                    ],
+                    "groups": [
+                        "CriteriaClose",
+                        "String",
+                        "Word"
+                    ],
+                    "transitions": [
+                        {
+                            "group": "CriteriaClose",
+                            "operation": "pop"
+                        },
+                        {
+                            "target": "CriteriaOperatorState",
+                            "operation": "push"
+                        }
+                    ]
+                },
+                "CriteriaOperatorState": {
+                    "group_defs": [
+                        {
+                            "name": "Operator",
+                            "regex": "\\s*\\=\\s*"
+                        }
+                    ],
+                    "groups": [
+                        "Operator"
+                    ],
+                    "transitions": [
+                        {
+                            "target": "CriteriaValueState"
+                        }
+                    ],
+                    "tokenize": false
+                },
+                "CriteriaValueState": {
+                    "groups": [
+                        "Boolean"
+                    ],
+                    "transitions": [
+                        {
+                            "target": "CriteriaEndState"
+                        }
+                    ]
+                },
+                "CriteriaEndState": {
+                    "group_defs": [
+                        {
+                            "name": "Operator",
+                            "regex": "\\s*(?:,\\s*|(?=\\}))"
+                        }
+                    ],
+                    "groups": [
+                        "Operator"
+                    ],
+                    "transitions": [
+                        {
+                            "operation": "pop"
+                        }
+                    ],
+                    "tokenize": false
+                },
+                "BraceEndState": {
                     "group_defs": [
                         {
                             "name": "Operator",
@@ -576,14 +1015,6 @@
         },
         "NBTRegion": {
             "group_defs": [
-                {
-                    "name": "CompoundOpen",
-                    "regex": "\\{"
-                },
-                {
-                    "name": "ListOpen",
-                    "regex": "\\["
-                },
                 {
                     "name": "ByteArrayOpen",
                     "regex": "\\[B;"
@@ -639,7 +1070,7 @@
                 "CompoundState": {
                     "group_defs": [
                         {
-                            "name": "TagName",
+                            "name": "Tag",
                             "regex": "\\w+(?=\\s*:)"
                         },
                         {
@@ -648,12 +1079,12 @@
                         }
                     ],
                     "groups": [
-                        "TagName",
-                        "CompoundClose"
+                        "CompoundClose",
+                        "Tag"
                     ],
                     "transitions": [
                         {
-                            "group": "TagName",
+                            "group": "Tag",
                             "target": "OperatorState",
                             "operation": "push"
                         },

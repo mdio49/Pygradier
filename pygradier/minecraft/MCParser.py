@@ -1,4 +1,5 @@
 import nbt, pygradier, os, json, re
+from abc import ABC, abstractproperty
 from enum import Enum
 from pygradier.model.groups import *
 from pygradier.model.Group import Group
@@ -30,6 +31,66 @@ class Parameter(Token):
 
     def get_command_string(self):
         return self.match
+
+class RawToken(Token):
+
+    def __init__(self, token):
+        super().__init__(token.match, token.group, token.tokens)
+    
+    def __str__(self):
+        return self.match
+
+class BooleanToken(Token):
+
+    def __init__(self, token):
+        super().__init__(token.match, token.group, token.tokens)
+        self.__value = True if self.match.lower() == 'true' else False
+    
+    def __str__(self):
+        return 'true' if self.value else 'false'
+    
+    @property
+    def value(self):
+        return self.__value
+
+class RangeToken(Token):
+
+    def __init__(self, token):
+        super().__init__(token.match, token.group, token.tokens)
+        match = re.match(r'^(?P<int>-?\d+)$|(?P<low>-?\d+)?\.{0,2}(?P<high>-?\d+)?', self.match)
+        self.__value = int(match.group('int')) if match.group('int') else None
+        self.__low = int(match.group('low')) if match.group('low') else None
+        self.__high = int(match.group('high')) if match.group('high') else None
+    
+    def __str__(self):
+        if self.is_integer():
+            return str(self.value)
+        if self.low and self.high:
+            return f'{self.low}..{self.high}'
+        if self.low:
+            return f'{self.low}..'
+        if self.high:
+            return f'..{self.high}'
+        return None
+    
+    def is_integer(self):
+        """Determines whether the range is a single value."""
+        return self.value is not None
+
+    @property
+    def value(self):
+        """The single integer value that this range takes."""
+        return self.__value
+
+    @property
+    def low(self):
+        """The low end of this range (or None for negative infinity)."""
+        return self.__low
+    
+    @property
+    def high(self):
+        """The high end of this range (or None for positive infinity)."""
+        return self.__high
 
 class NBTToken(Token):
 
@@ -94,6 +155,95 @@ class NBTToken(Token):
                 tag.add(cls.__get_tag(sub_token))
         return tag
 
+class BlockStatesToken(Token):
+
+    def __init__(self, token):
+        super().__init__(token.match, token.group, token.tokens)
+        self.__states = {}
+        for subtoken in token.tokens:
+            if subtoken.group.name == 'BlockStatesEnd':
+                break
+            self.__states[subtoken.match] = subtoken.tokens[0].match
+    
+    def __str__(self):
+        return ('[' + ','.join(f'{k}={v}' for k, v in self.states.items()) + ']') if len(self.states) > 0 else ''
+
+    @property
+    def states(self):
+        return self.__states
+
+class ListIndexToken(Token):
+
+    def __init__(self, index):
+        super().__init__("", None, [index])
+        self.__index = index
+    
+    def __str__(self):
+        return f'[{self.index}]'
+
+    @property
+    def index(self):
+        return self.__index
+
+class DictionaryToken(Token, ABC):
+
+    def __init__(self, token):
+        super().__init__(token.match, token.group, token.tokens)
+    
+    def __str__(self):
+        return '{' + ','.join(f'{k}={v}' for k, v in self.items.items()) + '}'
+
+    @abstractproperty
+    def items(self):
+        pass
+
+class ScoresToken(DictionaryToken):
+
+    def __init__(self, token):
+        super().__init__(token)
+        self.__scores = {}
+        for score in token.tokens:
+            if score.group.name == 'ScoresClose':
+                break
+            self.__scores[score.match] = RangeToken(score.tokens[0])
+    
+    @property
+    def items(self):
+        return self.__scores
+
+class CriteriaToken(DictionaryToken):
+
+    def __init__(self, token):
+        super().__init__(token)
+        self.__criteria = {}
+        for adv in token.tokens:
+            if adv.group.name == 'CriteriaClose':
+                break
+            self.__criteria[adv.match] = BooleanToken(adv.tokens[0])
+
+    @property
+    def items(self):
+        return self.__criteria
+
+class AdvancementsToken(DictionaryToken):
+
+    def __init__(self, token):
+        super().__init__(token)
+        self.__advancements = {}
+        for adv in token.tokens:
+            if adv.group.name == 'AdvancementsClose':
+                break
+            name = adv.match
+            value = adv.tokens[0]
+            if value.group.name == 'CriteriaOpen':
+                self.__advancements[name] = CriteriaToken(value)
+            else:
+                self.__advancements[name] = BooleanToken(value)
+
+    @property
+    def items(self):
+        return self.__advancements
+
 class SelectorArgument(Token):
 
     def __init__(self, name: str, value: Token, negated=False):
@@ -127,18 +277,13 @@ class SelectorParameter(Parameter):
             negated = token.tokens[0].group.name == "Negation"
             value = token.tokens[1] if negated else token.tokens[0]
             if token.group.name == "ScoresArgument":
-                scores = {}
-                for score in value.tokens[:-1]:
-                    match = re.match(r'^(?P<int>-?\d+)$|(?P<low>-?\d+)?\.{0,2}(?P<high>-?\d+)?', score.tokens[0].match)
-                    single = int(match.group('int')) if match.group('int') else None
-                    low = int(match.group('low')) if match.group('low') else None
-                    high = int(match.group('high')) if match.group('high') else None
-                    scores[score.match] = single if single else (low, high)
-                self.__args.append(SelectorArgument(name, scores, negated=negated))
+                self.__args.append(SelectorArgument(name, ScoresToken(value), negated=negated))
             elif token.group.name == "NBTArgument":
                 self.__args.append(SelectorArgument(name, NBTToken(value), negated=negated))
+            elif token.group.name == "AdvancementsArgument":
+                self.__args.append(SelectorArgument(name, AdvancementsToken(value), negated=negated))
             else:
-                self.__args.append(SelectorArgument(name, value, negated=negated))
+                self.__args.append(SelectorArgument(name, RawToken(value), negated=negated))
     
     def __str__(self):
         return f"{self.selector.value}" + (f"[{', '.join(str(arg) for arg in self.args)}]" if len(self.args) > 0 else "")
@@ -155,13 +300,7 @@ class SelectorParameter(Parameter):
         selector_args = []
         for arg in self.args:
             operator = '=!' if arg.negated else '='
-            if isinstance(arg.value, dict):
-                scores = ','.join(f'{k}={self.__range_to_str(v)}' for k, v in arg.value.items())
-                selector_args.append(f'{arg.name}{operator}{{{scores}}}')
-            elif isinstance(arg.value, NBTToken):
-                selector_args.append(f'{arg.name}{operator}{arg.value.nbt}')
-            else:
-                selector_args.append(f'{arg.name}{operator}{arg.value.match}')
+            selector_args.append(f'{arg.name}{operator}{arg.value}')
         return self.selector.value + (f"[{','.join(selector_args)}]" if len(selector_args) > 0 else "")
     
     @staticmethod
@@ -194,11 +333,11 @@ class NamespacedIDParameter(Parameter):
 
     @property
     def namespace(self):
-        return self.match[:self.match.index(':')]
+        return self.match[:self.match.index(':')] if ':' in self.match else None
 
     @property
     def name(self):
-        return self.match[self.match.index(':')+1:]
+        return self.match[self.match.index(':')+1:] if ':' in self.match else self.match
 
     @property
     def block_states(self):
@@ -210,7 +349,37 @@ class NamespacedIDParameter(Parameter):
     
     def get_command_string(self):
         block_states_str = ('[' + ','.join(f'{k}={v}' for k, v in self.block_states.items()) + ']') if len(self.block_states) > 0 else ''
-        return f"{self.namespace}:{self.name}{block_states_str}{self.nbt if len(self.nbt) > 0 else ''}"
+        return f"{(self.namespace + ':') if self.namespace else ''}{self.name}{block_states_str}{self.nbt if len(self.nbt) > 0 else ''}"
+
+class Comment(Parameter):
+
+    def __init__(self, token: Token):
+        super().__init__(token.match, token.group, [])
+
+    def __str__(self):
+        return "Comment(" + self.match + ")"
+
+    def get_command_string(self):
+        return "# " + self.match 
+
+class HybridParameter(Parameter):
+    """A parameter that is combined from multiple tokens where the parameter's type is ambiguous."""
+
+    def __init__(self, token: Token):
+        super().__init__(token.match, token.group, [self.__parse_token(t) for t in token.tokens])
+    
+    def get_command_string(self):
+        return ''.join(str(token) for token in self.tokens)
+        
+    @classmethod
+    def __parse_token(cls, token):
+        if token.group.name == 'CompoundOpen' or token.group.name == 'ListOpen':
+            return NBTToken(token)
+        elif token.group.name == 'BlockStatesOpen':
+            return BlockStatesToken(token)
+        elif token.group.name == 'ListIndexOpen':
+            return ListIndexToken(cls.__parse_token(token.tokens[0]))
+        return RawToken(token)
 
 class MCParser:
 
@@ -238,11 +407,15 @@ class MCParser:
         parameters = []
         for token in tokens:
             parameter = None
-            if token.group == Selector:
+            if token.group.name == 'EOL':
+                break
+            elif token.group.name == 'SelectorParameter':
                 selector = next(t for t in SelectorType if t.value == token.match)
                 parameter = SelectorParameter(selector, token.tokens[:-1])
-            elif token.group == NamespacedID:
-                parameter = NamespacedIDParameter(token)
+            elif token.group.name == 'HybridParameter':
+                parameter = HybridParameter(token)
+            elif token.group.name == 'Comment':
+                parameter = Comment(token)
             else:
                 parameter = Parameter(token.match, token.group, token.tokens)
             parameters.append(parameter)

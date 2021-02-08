@@ -9,6 +9,7 @@ PREDEFINED_GROUPS = {
     "Integer": Integer,
     "Float": Float,
     "Range": Range,
+    "Interval": Interval,
     "RelativeFloat": RelativeFloat,
     "Number": Number,
     "Word": Word,

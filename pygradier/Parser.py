@@ -15,6 +15,11 @@ class InvalidTokenError(ParserError):
     def __init__(self, line, pos):
         super().__init__(f"Could not match line to an appropriate group", line, pos)
 
+class NonExistentTransitionError(ParserError):
+
+    def __init__(self, line, pos):
+        super().__init__(f"No transition exists for the given match", line, pos)
+
 class IncompleteParsingError(ParserError):
 
     def __init__(self, line, pos):
@@ -39,7 +44,8 @@ class Parser:
         stack = []
         tokens = []
         
-        while len(line) > 0:
+        finished = False
+        while not finished:
             # Match the state's pattern at the current position in the line.
             pattern = state.build_regex()
             match = pattern.match(line)
@@ -63,7 +69,7 @@ class Parser:
             # Get the next state that this state transitions to given that the particular group was matched.
             transition = state.get_transition(group, stack)
             if not transition:
-                raise InvalidTokenError(line, 0)
+                raise NonExistentTransitionError(line, 0)
             
             if transition.operation == Operation.PUSH:
                 stack.append((transition.value, token, tokens))
@@ -73,7 +79,7 @@ class Parser:
                 state, token, tokens = stack.pop()
                 token.tokens.extend(subtokens)
             elif transition.operation == Operation.END:
-                break
+                finished = True
             
             state = transition.target
         
