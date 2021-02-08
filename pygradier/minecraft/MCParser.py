@@ -14,6 +14,45 @@ with open(os.path.join(os.path.dirname(__file__), 'mcparser.json'), 'r') as file
     model = Model.from_dict(data)
     PARSER = Parser(model)
 
+class TAG_Boolean(TAG_Byte):
+
+    def __init__(self, name: str, value: bool):
+        super().__init__(name, 1 if value else 0)
+    
+    def __str__(self):
+        return 'true' if self.value else 'false'
+
+class TAG_GenericList(nbt.NBTTag):
+
+    def __init__(self, name: str):
+        super().__init__(name, None)
+        self.__tags = []
+    
+    def __str__(self):
+        return '[' + ','.join(f'{tag}' for tag in self.tags) + ']'
+
+    @property
+    def tags(self):
+        return self.__tags
+    
+    @property
+    def value(self):
+        return self
+    
+    def validate(self, value):
+        pass
+
+    @classmethod
+    def get_id(cls):
+        return None
+    
+    def payload(self):
+        raise Exception("Generic list tags cannot be written to an NBT file.")
+    
+    @classmethod
+    def load(cls, name, fp):
+        pass
+
 class SelectorType(Enum):
     ALL_PLAYERS = '@a'
     ALL_ENTITIES = '@e'
@@ -129,12 +168,9 @@ class NBTToken(Token):
         elif value.group == String:
             tag = TAG_String(name, value.match[1:-1])
         elif value.group == Word:
-            if value.match == 'true':
-                tag = TAG_Byte(name, 1)
-            elif value.match == 'false':
-                tag = TAG_Byte(name, 0)
-            else:
-                tag = TAG_String(name, value.match)
+            tag = TAG_String(name, value.match)
+        elif value.group.name == "Boolean":
+            tag = TAG_Boolean(name, True if value.match == 'true' else False)
         elif value.group.name == "ByteArrayOpen":
             tag = TAG_Byte_Array(name, [int(entry.match) for entry in value.tokens[:-1]])
         elif value.group.name == "IntArrayOpen":
@@ -142,11 +178,23 @@ class NBTToken(Token):
         elif value.group.name == "LongArrayOpen":
             tag = TAG_Long_Array(name, [int(entry.match) for entry in value.tokens[:-1]])
         elif value.group.name == "ListOpen":
-            tag = TAG_List(name, None)
+            generic_list = TAG_GenericList(name)
+            use_generic_list = False
+            list_type = None
             for entry in value.tokens:
                 if entry.group.name == "ListClose":
                     break
-                tag.append(cls.__get_tag(entry))
+                entry_tag = cls.__get_tag(entry)
+                generic_list.tags.append(entry_tag)
+                if list_type is None:
+                    list_type = type(entry_tag)
+                elif not isinstance(entry_tag, list_type):
+                    use_generic_list = True
+            if not use_generic_list:
+                tag = TAG_List(name, list_type)
+                tag.extend(generic_list.tags)
+            else:
+                tag = generic_list
         elif value.group.name == "CompoundOpen":
             tag = TAG_Compound(name)
             for sub_token in value.tokens:

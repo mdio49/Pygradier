@@ -1080,17 +1080,17 @@
                     ],
                     "groups": [
                         "CompoundClose",
-                        "Tag"
+                        "String",
+                        "Word"
                     ],
                     "transitions": [
                         {
-                            "group": "Tag",
-                            "target": "OperatorState",
-                            "operation": "push"
-                        },
-                        {
                             "group": "CompoundClose",
                             "operation": "pop"
+                        },
+                        {
+                            "target": "OperatorState",
+                            "operation": "push"
                         }
                     ]
                 },
@@ -1186,6 +1186,7 @@
                         "ListOpen",
                         "String",
                         "Number",
+                        "Boolean",
                         "Word"
                     ],
                     "transitions": [
