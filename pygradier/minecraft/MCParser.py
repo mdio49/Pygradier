@@ -14,13 +14,23 @@ with open(os.path.join(os.path.dirname(__file__), 'mcparser.json'), 'r') as file
     model = Model.from_dict(data)
     PARSER = Parser(model)
 
+class SelectorType(Enum):
+    ALL_PLAYERS = '@a'
+    ALL_ENTITIES = '@e'
+    NEAREST_PLAYER = '@p'
+    RANDOM_PLAYER = '@r'
+    EXECUTOR = '@s'
+
 class TAG_Boolean(TAG_Byte):
 
     def __init__(self, name: str, value: bool):
         super().__init__(name, 1 if value else 0)
     
     def __str__(self):
-        return 'true' if self.value else 'false'
+        return 'false' if self.value == 0 else 'true'
+
+    def set_boolean_value(self, value: bool):
+        self.value = 1 if value else 0
 
 class TAG_GenericList(nbt.NBTTag):
 
@@ -53,15 +63,9 @@ class TAG_GenericList(nbt.NBTTag):
     def load(cls, name, fp):
         pass
 
-class SelectorType(Enum):
-    ALL_PLAYERS = '@a'
-    ALL_ENTITIES = '@e'
-    NEAREST_PLAYER = '@p'
-    RANDOM_PLAYER = '@r'
-    EXECUTOR = '@s'
-
 class Parameter(Token):
-
+    """A base class for a token that serves as a command parameter that can be reconstructed into a command string."""
+    
     def __init__(self, match: str, group: Group, tokens: list):
         super().__init__(match, group, tokens)
     
@@ -71,17 +75,25 @@ class Parameter(Token):
     def get_command_string(self):
         return self.match
 
-class RawToken(Token):
+class GenericParameter(Parameter):
+    """A generic paramater that contains only a single keyword."""
 
-    def __init__(self, token):
+    def __init__(self, keyword: str):
+        super().__init__(keyword, Generic, [])
+
+class RawToken(Token):
+    """A raw token whose string conversion method produces its match only."""
+
+    def __init__(self, token: Token):
         super().__init__(token.match, token.group, token.tokens)
     
     def __str__(self):
         return self.match
 
 class BooleanToken(Token):
+    """A token that contains a boolean value."""
 
-    def __init__(self, token):
+    def __init__(self, token: Token):
         super().__init__(token.match, token.group, token.tokens)
         self.__value = True if self.match.lower() == 'true' else False
     
@@ -93,8 +105,9 @@ class BooleanToken(Token):
         return self.__value
 
 class RangeToken(Token):
+    """A token that contains an integer range."""
 
-    def __init__(self, token):
+    def __init__(self, token: Token):
         super().__init__(token.match, token.group, token.tokens)
         match = re.match(r'^(?P<int>-?\d+)$|(?P<low>-?\d+)?\.{0,2}(?P<high>-?\d+)?', self.match)
         self.__value = int(match.group('int')) if match.group('int') else None
@@ -132,6 +145,7 @@ class RangeToken(Token):
         return self.__high
 
 class NBTToken(Token):
+    """A token that contains NBT data."""
 
     def __init__(self, token: Token):
         super().__init__("", token.group, [token])
@@ -204,8 +218,9 @@ class NBTToken(Token):
         return tag
 
 class BlockStatesToken(Token):
+    """A token that contains a key-value mapping of block states."""
 
-    def __init__(self, token):
+    def __init__(self, token: Token):
         super().__init__(token.match, token.group, token.tokens)
         self.__states = {}
         for subtoken in token.tokens:
@@ -221,8 +236,9 @@ class BlockStatesToken(Token):
         return self.__states
 
 class ListIndexToken(Token):
+    """A token that contains a list index, the index being another token."""
 
-    def __init__(self, index):
+    def __init__(self, index: Token):
         super().__init__("", None, [index])
         self.__index = index
     
@@ -234,8 +250,9 @@ class ListIndexToken(Token):
         return self.__index
 
 class DictionaryToken(Token, ABC):
+    """An abstract class for a token that contains a dictionary of key-value pairs."""
 
-    def __init__(self, token):
+    def __init__(self, token: Token):
         super().__init__(token.match, token.group, token.tokens)
     
     def __str__(self):
@@ -246,6 +263,7 @@ class DictionaryToken(Token, ABC):
         pass
 
 class ScoresToken(DictionaryToken):
+    """A token that contains a mapping of scoreboard objectives to integer ranges."""
 
     def __init__(self, token):
         super().__init__(token)
@@ -260,6 +278,7 @@ class ScoresToken(DictionaryToken):
         return self.__scores
 
 class CriteriaToken(DictionaryToken):
+    """A token that contains a mapping of advancement criteria to a boolean value."""
 
     def __init__(self, token):
         super().__init__(token)
@@ -274,6 +293,7 @@ class CriteriaToken(DictionaryToken):
         return self.__criteria
 
 class AdvancementsToken(DictionaryToken):
+    """A token that contains a mapping of advancements to either a boolean value or a `CriteriaToken`."""
 
     def __init__(self, token):
         super().__init__(token)
@@ -293,6 +313,7 @@ class AdvancementsToken(DictionaryToken):
         return self.__advancements
 
 class SelectorArgument(Token):
+    """A token that represents a selector argument (a name with a corresponding value)."""
 
     def __init__(self, name: str, value: Token, negated=False):
         super().__init__(name, SelectorArgument, [value])
@@ -315,6 +336,7 @@ class SelectorArgument(Token):
         return self.__negated
 
 class SelectorParameter(Parameter):
+    """A selector parameter, containing a particular type of entity selector with an optional list of arguments."""
 
     def __init__(self, selector: SelectorType, args: list):
         super().__init__(selector.name, Selector, args)
@@ -337,12 +359,12 @@ class SelectorParameter(Parameter):
         return f"{self.selector.value}" + (f"[{', '.join(str(arg) for arg in self.args)}]" if len(self.args) > 0 else "")
 
     @property
-    def args(self):
-        return self.__args
-
-    @property
     def selector(self):
         return self.__selector
+    
+    @property
+    def args(self):
+        return self.__args
     
     def get_command_string(self):
         selector_args = []
@@ -350,19 +372,6 @@ class SelectorParameter(Parameter):
             operator = '=!' if arg.negated else '='
             selector_args.append(f'{arg.name}{operator}{arg.value}')
         return self.selector.value + (f"[{','.join(selector_args)}]" if len(selector_args) > 0 else "")
-    
-    @staticmethod
-    def __range_to_str(range_tuple):
-        if isinstance(range_tuple, int):
-            return range_tuple
-        low, high = range_tuple
-        if low and high:
-            return f'{low}..{high}'
-        if low:
-            return f'{low}..'
-        if high:
-            return f'..{high}'
-        return None
 
 class NamespacedIDParameter(Parameter):
 
@@ -400,6 +409,7 @@ class NamespacedIDParameter(Parameter):
         return f"{(self.namespace + ':') if self.namespace else ''}{self.name}{block_states_str}{self.nbt if len(self.nbt) > 0 else ''}"
 
 class Comment(Parameter):
+    """A parameter that defines a comment."""
 
     def __init__(self, token: Token):
         super().__init__(token.match, token.group, [])
@@ -430,6 +440,7 @@ class HybridParameter(Parameter):
         return RawToken(token)
 
 class MCParser:
+    """A static class that parses commands in vanilla Minecraft."""
 
     def __init__(self):
         pass
@@ -464,6 +475,8 @@ class MCParser:
                 parameter = HybridParameter(token)
             elif token.group.name == 'Comment':
                 parameter = Comment(token)
+            elif token.group.name == 'Keyword':
+                parameter = GenericParameter(token.match)
             else:
                 parameter = Parameter(token.match, token.group, token.tokens)
             parameters.append(parameter)
