@@ -1,4 +1,4 @@
-import nbt, pygradier, os, json, re
+import nbt, pygradier, os, json, re, codecs
 from abc import ABC, abstractproperty
 from enum import Enum
 from pygradier.model.groups import *
@@ -117,11 +117,11 @@ class RangeToken(Token):
     def __str__(self):
         if self.is_integer():
             return str(self.value)
-        if self.low and self.high:
+        if self.low is not None and self.high is not None:
             return f'{self.low}..{self.high}'
-        if self.low:
+        if self.low is not None:
             return f'{self.low}..'
-        if self.high:
+        if self.high is not None:
             return f'..{self.high}'
         return None
     
@@ -180,7 +180,7 @@ class NBTToken(Token):
             else:
                 tag = TAG_Int(name, int(value.match))
         elif value.group == String:
-            tag = TAG_String(name, value.match[1:-1])
+            tag = TAG_String(name, codecs.decode(value.match[1:-1], 'unicode_escape'))
         elif value.group == Word:
             tag = TAG_String(name, value.match)
         elif value.group.name == "Boolean":
