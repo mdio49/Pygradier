@@ -180,7 +180,7 @@ class NBTToken(Token):
             else:
                 tag = TAG_Int(name, int(value.match))
         elif value.group == String:
-            tag = TAG_String(name, codecs.decode(value.match[1:-1], 'unicode_escape'))
+            tag = TAG_String(name, codecs.decode(value.match[1:-1], 'unicode_escape').encode('latin1').decode('utf-8'))
         elif value.group == Word:
             tag = TAG_String(name, value.match)
         elif value.group.name == "Boolean":
